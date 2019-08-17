@@ -22,7 +22,7 @@ sam/lambda/submit-polly-synthesis-task
 # Other
 midway/
 deploy.sh
-
+packaged.yaml
 
 # Ignore the amplify folder; used for prototyping, but then I copy it into my main SAM template.yaml
 amplify/
