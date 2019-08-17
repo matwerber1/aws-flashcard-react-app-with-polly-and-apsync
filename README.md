@@ -17,7 +17,7 @@ This is a work in process, not currently ready / working.
         "front_text": "string",
         "back_text": "string",
         "back_audio": "string",
-        "back_audio_ready": "string"
+        "back_audio_ready": boolean
     }
     ```
 
