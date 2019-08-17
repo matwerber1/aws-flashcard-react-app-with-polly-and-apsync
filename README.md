@@ -3,11 +3,11 @@
 This is a work in process, not currently ready / working. 
 
 
-# Architecture
+## Architecture
 
-1. React app - hosts front-end to interact with flashcards (view, edit, delete, list)
+1. **React app** - hosts front-end to interact with flashcards (view, edit, delete, list)
 
-2. Flashcard Table - Amazon DynamoDB stores our flashcards with the following schema:
+2. **Flashcard Table** - Amazon DynamoDB stores our flashcards with the following schema:
 
     ```json
     {
@@ -23,7 +23,7 @@ This is a work in process, not currently ready / working.
 
     Since back audio is created asynchronously when a flashcard is created/edited, the **back_audio_ready** attribute indicates whether this asynchronous synthesis is complete. 
 
-3. GraphQL API - Amazon AppSync hosts a GraphQL API that is configured to handle all queries and mutations against the Amazon DynamoDB flashcard table. Rather than interact directly with the DynamoDB table, changes to flashcards should be pushed through this API; note - you could technically make changes directly to the DynamoDB table but doing so means you would not be able to take advantage of AppSync's subscriptions capability (not currently used in this app) and also means you'd have to use two different CRUD mechanisms (e.g. straight DynamoDB API calls as well as GraphQL).
+3. **GraphQL API**- Amazon AppSync hosts a GraphQL API that is configured to handle all queries and mutations against the Amazon DynamoDB flashcard table. Rather than interact directly with the DynamoDB table, changes to flashcards should be pushed through this API; note - you could technically make changes directly to the DynamoDB table but doing so means you would not be able to take advantage of AppSync's subscriptions capability (not currently used in this app) and also means you'd have to use two different CRUD mechanisms (e.g. straight DynamoDB API calls as well as GraphQL).
 
 4. **Amazon Cognito User Pool** - a Cognito User Pool (CUP) acts as our application's identity provider.
 
