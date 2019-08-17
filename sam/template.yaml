@@ -1,0 +1,703 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  sam-app
+
+  Sample SAM Template for sam-app
+
+Parameters:
+  PollyOutputBucket:
+    Type: String
+    Default: matwerber.info
+
+  IamExternalId:
+    Type: String
+    Default: flashcard-app-werberm-384u823        # any value, just to prevent unauth access to certain roles
+
+Globals:
+  Function:
+    Timeout: 3
+
+Resources:
+  ##############################################################################
+  # DynamoDB
+  ##############################################################################
+  FlashcardTable:
+    Type: AWS::DynamoDB::Table
+    Properties: 
+      AttributeDefinitions: 
+        - 
+          AttributeName: "card_id"
+          AttributeType: "S"
+      KeySchema: 
+        - 
+          AttributeName: "card_id"
+          KeyType: "HASH"
+      BillingMode: PAY_PER_REQUEST
+      StreamSpecification: 
+        StreamViewType: NEW_AND_OLD_IMAGES
+
+  DdbStreamProcessor:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lambda/ddb-stream-processor/
+      Handler: app.handler
+      Runtime: nodejs8.10
+      Environment:
+        Variables:
+          POLLY_SQS_QUEUE: !Ref PollySynthesisQueue
+      Events: 
+        ProcessStreamEvent:
+          Type: DynamoDB
+          Properties:
+            Stream: !GetAtt FlashcardTable.StreamArn
+            StartingPosition: TRIM_HORIZON
+            BatchSize: 1
+            Enabled: true
+      Policies:
+        - Statement:
+          - 
+            Sid: PollyPermissions
+            Effect: Allow
+            Action:
+              - polly:StartSpeechSynthesisTask
+              - polly:GetSpeechSynthesisTask
+              - polly:ListSpeechSynthesisTasks
+            Resource: 
+              - "*"
+        - Statement:
+          - 
+            Sid: S3PermissionForPollySynthesis
+            Effect: Allow
+            Action:
+              - s3:PutObject
+            Resource: 
+              - !Sub "arn:aws:s3:::${PollyOutputBucket}/*"
+        - Statement:
+          - 
+            Sid: PollySynthesisSnsTopicWrite
+            Effect: Allow
+            Action:
+              - sns:Publish
+            Resource: 
+              - !Ref PollySynthesisTopic
+        - Statement:
+          - 
+            Sid: AppsyncPermission
+            Effect: Allow
+            Action:
+              - appsync:GraphQL
+            Resource: 
+              - !Sub "${GraphqlApi.Arn}/*"
+        - Statement:
+          - 
+            Sid: DynamoDB
+            Effect: Allow
+            Action:
+              - dynamodb:*
+            Resource: 
+              - !Sub "${FlashcardTable.Arn}/*"
+              - !Sub "${FlashcardTable.Arn}"
+        - Statement:
+          - 
+            Sid: SQS
+            Effect: Allow
+            Action:
+              - sqs:*
+            Resource: 
+              - !GetAtt PollySynthesisQueue.Arn
+
+  ##############################################################################
+  # Polly
+  ##############################################################################
+
+  PollySynthesisQueue: 
+    # DynamoDB stream processor Lambda inserts message to this queue which
+    # represents text that needs to be submitted to Polly for synthesis
+    Type: AWS::SQS::Queue
+    Properties: 
+      ReceiveMessageWaitTimeSeconds: 20    # long polling
+      VisibilityTimeout: 30
+
+  SubmitPollySynthesisTaskFunction:
+    # Function receives text from SQS queue and submits to Polly for synthesis.
+    # If submission successful, function then updates DynamoDB Flashcard table
+    # with the (to-be created) S3 output file.
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lambda/submit-polly-synthesis-task/
+      Handler: app.handler
+      Runtime: nodejs8.10
+      Environment:
+        Variables:
+          POLLY_SQS_QUEUE: !Ref PollySynthesisQueue
+          POLLY_SNS_TOPIC: !Ref PollySynthesisTopic
+          POLLY_OUTPUT_BUCKET: !Ref PollyOutputBucket
+          APPSYNC_ENDPOINT: !GetAtt GraphqlApi.GraphQLUrl
+          FLASHCARD_TABLE: !Ref FlashcardTable
+      #Layers:
+        #  - !Ref AwsSdkNodeLayer
+      Events:
+        SynthesisSqsEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt PollySynthesisQueue.Arn
+            BatchSize: 10
+            Enabled: true
+      Policies:
+        - Statement:
+          - 
+            Sid: PollyPermissions
+            Effect: Allow
+            Action:
+              - polly:StartSpeechSynthesisTask
+              - polly:GetSpeechSynthesisTask
+              - polly:ListSpeechSynthesisTasks
+            Resource: 
+              - "*"
+        - Statement:
+          - 
+            Sid: S3PermissionForPollySynthesis
+            Effect: Allow
+            Action:
+              - s3:PutObject
+            Resource: 
+              - !Sub "arn:aws:s3:::${PollyOutputBucket}/*"
+        - Statement:
+          - 
+            Sid: PollySynthesisSnsTopicWrite
+            Effect: Allow
+            Action:
+              - sns:Publish
+            Resource: 
+              - !Ref PollySynthesisTopic
+        - Statement:
+          - 
+            Sid: AppsyncPermission
+            Effect: Allow
+            Action:
+              - appsync:GraphQL
+            Resource: 
+              - !Sub "${GraphqlApi.Arn}/*"
+        - Statement:
+          - 
+            Sid: DynamoDB
+            Effect: Allow
+            Action:
+              - dynamodb:*
+            Resource: 
+              - !Sub "${FlashcardTable.Arn}/*"
+              - !Sub "${FlashcardTable.Arn}"
+        - Statement:
+          - 
+            Sid: SQS
+            Effect: Allow
+            Action:
+              - sqs:*
+            Resource: 
+              - !GetAtt PollySynthesisQueue.Arn
+
+  PollySynthesisTopic:
+    # Receives message when Polly synthesis completes
+    Type: AWS::SNS::Topic
+    Properties: {}
+
+  PollySynthesisSnsTopicHandler:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lambda/handle-polly-sns-message/
+      Handler: app.handler
+      Runtime: nodejs8.10
+      Environment:
+        Variables:
+          FLASHCARD_TABLE: !Ref FlashcardTable
+      Events:
+        SynthesisSnsEvent:
+          Type: SNS
+          Properties:
+            Topic: !Ref PollySynthesisTopic
+      Policies:
+        - Statement:
+          - 
+            Sid: DynamoDBPermissions
+            Effect: Allow
+            Action:
+              - dynamodb:*
+            Resource: 
+              - !GetAtt FlashcardTable.Arn
+
+  ##############################################################################
+  # AppSync & GraphQL API
+  ##############################################################################
+  GraphqlApi:
+    Type: AWS::AppSync::GraphQLApi
+    Properties: 
+      AuthenticationType: AWS_IAM
+      Name: !Sub "${AWS::StackName}-graphql-api"
+      LogConfig:
+        CloudWatchLogsRoleArn: !GetAtt AppSyncRole.Arn
+        FieldLogLevel: ALL
+
+  GraphqlSchema:
+    Type: AWS::AppSync::GraphQLSchema
+    Properties: 
+      ApiId: !GetAtt GraphqlApi.ApiId
+      DefinitionS3Location: s3://werberm-sandbox/appsync/flashcard-schema.graphql
+
+  GraphqlDatasource:
+    Type: AWS::AppSync::DataSource
+    Properties: 
+      ApiId: !GetAtt GraphqlApi.ApiId
+      DynamoDBConfig: 
+        AwsRegion: !Ref AWS::Region
+        TableName: !Ref FlashcardTable
+        UseCallerCredentials: TRUE
+      Name: !Sub "${AWS::StackName}CardTable"
+      ServiceRoleArn: !GetAtt AppSyncRole.Arn
+      Type: AMAZON_DYNAMODB
+
+  AppSyncRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument: 
+        Version: "2012-10-17"
+        Statement: 
+          - Effect: "Allow"
+            Principal: 
+              Service: 
+                - "appsync.amazonaws.com"
+            Action: 
+              - "sts:AssumeRole"
+      Path: "/service-role/"
+      Policies:
+        -
+          PolicyName: "DDB"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+            -
+              Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource:
+                - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*"
+            - 
+              Effect: Allow
+              Action:
+                - dynamodb:DeleteItem
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:Query
+                - dynamodb:Scan
+                - dynamodb:UpdateItem
+              Resource:
+                - !Sub "${FlashcardTable.Arn}"
+                - !Sub "${FlashcardTable.Arn}/*"
+
+  GraphqlListCardsQueryResolver:
+    Type: AWS::AppSync::Resolver
+    DependsOn: GraphqlSchema
+    Properties: 
+      ApiId: !GetAtt GraphqlApi.ApiId
+      DataSourceName: !GetAtt GraphqlDatasource.Name
+      Kind: UNIT
+      TypeName: Query
+      FieldName: listCards
+      RequestMappingTemplate: |
+        #set( $limit = $util.defaultIfNull($context.args.limit, 10) )
+        #set( $ListRequest = {
+          "version": "2017-02-28",
+          "limit": $limit
+        } )
+        #if( $context.args.nextToken )
+          #set( $ListRequest.nextToken = "$context.args.nextToken" )
+        #end
+        #if( $context.args.filter )
+          #set( $ListRequest.filter = $util.parseJson("$util.transform.toDynamoDBFilterExpression($ctx.args.filter)") )
+        #end
+        #if( !$util.isNull($modelQueryExpression) && !$util.isNullOrEmpty($modelQueryExpression.expression) )
+          $util.qr($ListRequest.put("operation", "Query"))
+          $util.qr($ListRequest.put("query", $modelQueryExpression))
+        #else
+          $util.qr($ListRequest.put("operation", "Scan"))
+        #end
+        $util.toJson($ListRequest)
+      ResponseMappingTemplate: |
+        $util.toJson($ctx.result)
+
+  GraphqlSingleCardQueryResolver:
+    Type: AWS::AppSync::Resolver
+    DependsOn: GraphqlSchema
+    Properties: 
+      ApiId: !GetAtt GraphqlApi.ApiId
+      DataSourceName: !GetAtt GraphqlDatasource.Name
+      Kind: UNIT
+      TypeName: Query
+      FieldName: singleCard
+      RequestMappingTemplate: |
+        {
+          "version": "2017-02-28",
+          "operation": "GetItem",
+          "key": {
+            "card_id": $util.dynamodb.toDynamoDBJson($ctx.args.card_id),
+          }
+        }
+      ResponseMappingTemplate: |
+        $util.toJson($ctx.result)
+
+  GraphqlCreateCardMutationResolver:
+    Type: AWS::AppSync::Resolver
+    DependsOn: GraphqlSchema
+    Properties: 
+      ApiId: !GetAtt GraphqlApi.ApiId
+      DataSourceName: !GetAtt GraphqlDatasource.Name
+      Kind: UNIT
+      TypeName: Mutation
+      FieldName: createCard
+      RequestMappingTemplate: |
+        {
+            "version" : "2017-02-28",
+            "operation" : "PutItem",
+            "key" : {
+                ## If object "id" should come from GraphQL arguments, change to $util.dynamodb.toDynamoDBJson($ctx.args.id)
+                "card_id": $util.dynamodb.toDynamoDBJson($util.autoId()),
+            },
+            "attributeValues" : $util.dynamodb.toMapValuesJson($ctx.args)
+        }
+      ResponseMappingTemplate: |
+        $util.toJson($ctx.result)
+
+  GraphqlDeleteCardMutationResolver:
+    Type: AWS::AppSync::Resolver
+    DependsOn: GraphqlSchema
+    Properties: 
+      ApiId: !GetAtt GraphqlApi.ApiId
+      DataSourceName: !GetAtt GraphqlDatasource.Name
+      Kind: UNIT
+      TypeName: Mutation
+      FieldName: deleteCard
+      RequestMappingTemplate: |
+        {
+            "version" : "2017-02-28",
+            "operation" : "DeleteItem",
+            "key" : {
+                ## If your table's hash key is not named 'id', update it here. **
+                "card_id" : { "S" : "${ctx.args.card_id}" }
+                ## If your table has a sort key, add it as an item here. **
+            }
+        }
+      ResponseMappingTemplate: |
+        $util.toJson($ctx.result)
+
+  GraphqlUpdateCardMutationResolver:
+    Type: AWS::AppSync::Resolver
+    DependsOn: GraphqlSchema
+    Properties: 
+      ApiId: !GetAtt GraphqlApi.ApiId
+      DataSourceName: !GetAtt GraphqlDatasource.Name
+      Kind: UNIT
+      TypeName: Mutation
+      FieldName: updateCard
+      RequestMappingTemplate: |
+        {
+            "version" : "2017-02-28",
+            "operation" : "UpdateItem",
+            "key" : {
+                "card_id" : { "S" : "${context.arguments.card_id}" }
+            },
+
+            ## Set up some space to keep track of things you're updating **
+            #set( $expNames  = {} )
+            #set( $expValues = {} )
+            #set( $expSet = {} )
+            #set( $expRemove = [] )
+
+            ## Iterate through each argument, skipping "id" and "expectedVersion" **
+            #foreach( $entry in $context.arguments.entrySet() )
+                #if( $entry.key != "card_id")
+                    #if( (!$entry.value) && ("$!{entry.value}" == "") )
+                        ## If the argument is set to "null", then remove that attribute from the item in DynamoDB **
+
+                        #set( $discard = ${expRemove.add("#${entry.key}")} )
+                        $!{expNames.put("#${entry.key}", "$entry.key")}
+                    #else
+                        ## Otherwise set (or update) the attribute on the item in DynamoDB **
+
+                        $!{expSet.put("#${entry.key}", ":${entry.key}")}
+                        $!{expNames.put("#${entry.key}", "$entry.key")}
+                        $!{expValues.put(":${entry.key}", { "S" : "${entry.value}" })}
+                    #end
+                #end
+            #end
+
+            ## Start building the update expression, starting with attributes you're going to SET **
+            #set( $expression = "" )
+            #if( !${expSet.isEmpty()} )
+                #set( $expression = "SET" )
+                #foreach( $entry in $expSet.entrySet() )
+                    #set( $expression = "${expression} ${entry.key} = ${entry.value}" )
+                    #if ( $foreach.hasNext )
+                        #set( $expression = "${expression}," )
+                    #end
+                #end
+            #end
+            
+            ## Continue building the update expression, adding attributes you're going to REMOVE **
+            #if( !${expRemove.isEmpty()} )
+                #set( $expression = "${expression} REMOVE" )
+
+                #foreach( $entry in $expRemove )
+                    #set( $expression = "${expression} ${entry}" )
+                    #if ( $foreach.hasNext )
+                        #set( $expression = "${expression}," )
+                    #end
+                #end
+            #end
+
+            ## Finally, write the update expression into the document, along with any expressionNames and expressionValues **
+            "update" : {
+                "expression" : "${expression}"
+                #if( !${expNames.isEmpty()} )
+                    ,"expressionNames" : $utils.toJson($expNames)
+                #end
+                #if( !${expValues.isEmpty()} )
+                    ,"expressionValues" : $utils.toJson($expValues)
+                #end
+            }
+        }
+      ResponseMappingTemplate: |
+        $util.toJson($ctx.result)
+
+  ##############################################################################
+  # Cognito User Pool
+  ##############################################################################
+  
+  FlashcardUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      Schema: 
+        -
+          Name: email
+          Required: true
+          Mutable: true      
+      AutoVerifiedAttributes:
+        - email
+      EmailVerificationMessage: "Your flashcard verification code is {####}"
+      EmailVerificationSubject: "Flashcard verification code is {####}"
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+          RequireUppercase: true
+      MfaConfiguration: "OFF"
+      SmsVerificationMessage: "Your flashcard verification code is {####}"
+      SmsConfiguration: 
+        SnsCallerArn: !GetAtt CognitoSnsRole.Arn
+        ExternalId: !Ref IamExternalId
+
+  UserPoolClientWeb:
+    # Client for our user-facing app
+    Type: "AWS::Cognito::UserPoolClient"
+    Properties:
+      RefreshTokenValidity: 30
+      UserPoolId: !Ref FlashcardUserPool
+    DependsOn: FlashcardUserPool
+
+  UserPoolClient:
+    # Used by a custom CF Lambda resource that creates our Identity Pool
+    Type: "AWS::Cognito::UserPoolClient"
+    Properties:      
+      GenerateSecret: true
+      RefreshTokenValidity: 30
+      UserPoolId: !Ref FlashcardUserPool
+    DependsOn: FlashcardUserPool
+
+  userpoolClientLambdaRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+    DependsOn: UserPoolClient
+  
+  UserPoolClientLambda:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Code:
+        ZipFile: !Join 
+          - |+
+          - - 'const response = require(''cfn-response'');'
+            - 'const aws = require(''aws-sdk'');'
+            - 'const identity = new aws.CognitoIdentityServiceProvider();'
+            - 'exports.handler = (event, context, callback) => {'
+            - ' if (event.RequestType == ''Delete'') { '
+            - '   response.send(event, context, response.SUCCESS, {})'
+            - ' }'
+            - ' if (event.RequestType == ''Update'' || event.RequestType == ''Create'') {'
+            - '   const params = {'
+            - '     ClientId: event.ResourceProperties.clientId,'
+            - '     UserPoolId: event.ResourceProperties.userpoolId'
+            - '   };'
+            - '   identity.describeUserPoolClient(params).promise()'
+            - '     .then((res) => {'
+            - '       response.send(event, context, response.SUCCESS, {''appSecret'': res.UserPoolClient.ClientSecret});'   
+            - '     })'
+            - '     .catch((err) => {'
+            - '       response.send(event, context, response.FAILED, {err});'
+            - '     });'
+            - ' }'
+            - '};'
+      Handler: index.handler
+      Runtime: nodejs8.10
+      Timeout: '300'
+      Role: !GetAtt userpoolClientLambdaRole.Arn
+    DependsOn: userpoolClientLambdaRole 
+    
+  UserPoolClientInputs:
+    Type: 'Custom::LambdaCallout'
+    Properties:
+      ServiceToken: !GetAtt UserPoolClientLambda.Arn
+      clientId: !Ref UserPoolClient
+      userpoolId: !Ref FlashcardUserPool
+    DependsOn: UserPoolClientLogPolicy
+
+  CognitoSnsRole: 
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument: 
+        Version: "2012-10-17"
+        Statement: 
+          - Sid: ""
+            Effect: "Allow"
+            Principal: 
+              Service: "cognito-idp.amazonaws.com"
+            Action: 
+              - "sts:AssumeRole"
+            Condition: 
+              StringEquals:
+                sts:ExternalId: !Ref IamExternalId
+      Policies: 
+        - 
+          PolicyName: !Sub "${AWS::StackName}-cognito-sns-policy"
+          PolicyDocument: 
+            Version: "2012-10-17"
+            Statement: 
+              - 
+                Effect: "Allow"
+                Action: 
+                  - "sns:Publish"
+                Resource: "*"
+  
+  UserPoolClientLambdaPolicy:
+    Type: 'AWS::IAM::Policy'
+    Properties:
+      PolicyName: !Sub "${AWS::StackName}-cognito-idp-policy"
+      Roles: 
+        - !Ref userpoolClientLambdaRole
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - 'cognito-idp:DescribeUserPoolClient'
+            Resource: !GetAtt FlashcardUserPool.Arn
+    DependsOn: UserPoolClientLambda
+
+  UserPoolClientLogPolicy:
+    Type: 'AWS::IAM::Policy'
+    Properties:
+      PolicyName: !Sub "${AWS::StackName}-cognito-lambda-policy"
+      Roles: 
+        - !Ref userpoolClientLambdaRole
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - 'logs:CreateLogGroup'
+              - 'logs:CreateLogStream'
+              - 'logs:PutLogEvents'
+            Resource: !Sub  
+              - arn:aws:logs:${region}:${account}:log-group:/aws/lambda/${lambda}:log-stream:*
+              - { region: !Ref "AWS::Region",  account: !Ref "AWS::AccountId", lambda: !Ref UserPoolClientLambda}
+    DependsOn: UserPoolClientLambdaPolicy 
+
+  ##############################################################################
+  # Cognito Identity Pool
+  ##############################################################################
+  
+  FlashcardIdentityPool:
+    Type: AWS::Cognito::IdentityPool
+    Properties:     
+      CognitoIdentityProviders:
+        - ClientId:  !Ref UserPoolClient
+          ProviderName: !Sub
+            - cognito-idp.${region}.amazonaws.com/${client}
+            - { region: !Ref "AWS::Region",  client: !Ref FlashcardUserPool}
+        - ClientId:  !Ref UserPoolClientWeb
+          ProviderName: !Sub
+            - cognito-idp.${region}.amazonaws.com/${client}
+            - { region: !Ref "AWS::Region",  client: !Ref FlashcardUserPool}
+      AllowUnauthenticatedIdentities: false
+    DependsOn: UserPoolClientInputs 
+    
+  IdentityPoolRoleMap:
+    Type: AWS::Cognito::IdentityPoolRoleAttachment
+    Properties: 
+      IdentityPoolId: !Ref FlashcardIdentityPool
+      Roles:
+          unauthenticated: !GetAtt IdentityPoolUnauthRole.Arn
+          authenticated: !GetAtt IdentityPoolAuthRole.Arn
+    DependsOn: FlashcardIdentityPool
+
+  IdentityPoolAuthRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Sid: ''
+          Effect: Allow
+          Principal:
+            Federated: cognito-identity.amazonaws.com
+          Action: sts:AssumeRoleWithWebIdentity
+          Condition:
+            ForAnyValue:StringLike:
+              cognito-identity.amazonaws.com:amr: authenticated
+      Policies:
+        -
+          PolicyName: "AppSync"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+            -
+              Effect: Allow
+              Action:
+                - appsync:*
+              Resource:
+                - "*"
+  
+  IdentityPoolUnauthRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Sid: ''
+          Effect: Allow
+          Principal:
+            Federated: cognito-identity.amazonaws.com
+          Action: sts:AssumeRoleWithWebIdentity
+          Condition:
+            ForAnyValue:StringLike:
+              cognito-identity.amazonaws.com:amr: unauthenticated

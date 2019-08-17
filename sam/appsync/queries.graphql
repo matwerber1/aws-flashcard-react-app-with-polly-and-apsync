@@ -1,0 +1,60 @@
+query GetCards {
+  listCards {
+    card_id
+    front_text
+    back_text
+  }
+}
+
+query GetCard {
+  singleCard(card_id: "1") {
+    card_id,
+    front_text,
+    back_text
+  }
+}
+
+mutation CreateCard {
+    createCard(
+        front_text: "this is the test",
+        back_text: "this is the back test"
+    ) {
+        card_id
+        front_text
+        back_text
+    }
+}
+
+mutation updateCard {
+  updateCard(
+    card_id:"1",
+  	front_text: "this is the front text",
+  	back_text: "this is the back text",
+    back_audio: "path to s3 audio") {
+    card_id
+    front_text
+    back_text
+    back_audio
+  }
+}
+
+mutation DeleteCard {
+    deleteCard(
+        card_id: "1ce97330-ad0e-4ec8-9bb1-7712e9ddbfbd"
+    ) {
+        card_id
+    }
+}
+
+mutation updateCard {
+  updateCard(
+    card_id:"1",
+  	front_text: "this is the front text",
+  	back_text: "this is the back text",
+    back_audio: "path to s3 audio") {
+    card_id
+    front_text
+    back_text
+    back_audio
+  }
+}
