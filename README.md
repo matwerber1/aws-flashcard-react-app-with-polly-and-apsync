@@ -31,6 +31,8 @@ This is a work in process, not currently ready / working.
 
 5. **Amazon Cognito Identity Pool** - a Cognito Identity Pool (CIP) provides temporary IAM credentials to our authenticated CUP users so that they may interact with our backend AWS resources. 
 
+    * Cognito's choice of naming is confusing, as a "Cognito Identity Pool" is not an identity provider. Again, it's a mechanism to give users that are already authenticated by an IdP (in our case, a Cognito User Pool) temporary IAM credentials to a specific IAM role associated with the Cognito Identity Pool. 
+
 6. **Flashcard Stream** - An Amazon DynamoDB stream that receives all changes to the flashcard table.
 
 7. **Flashcard Stream Processor** - an AWS Lambda function that reads from the flashcard stream; for new cards or modified back text of existing cards, the function submits a task to an Amazon SQS queue for later synthesis to text by Amazon Polly. For items deleted from DynamoDB, this function deletes it's back text audio file from the **back_audio** path (if applicable).
