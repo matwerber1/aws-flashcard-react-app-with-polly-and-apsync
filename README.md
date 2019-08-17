@@ -5,7 +5,9 @@ This is a work in process, not currently ready / working.
 
 ## Architecture
 
-1. **React app** - hosts front-end to interact with flashcards (view, edit, delete, list)
+1. **React app** - hosts our front-end to interact with flashcards (view, edit, delete, list); this was built using the [AWS Amplify CLI](https://github.com/aws-amplify/amplify-cli).
+
+    * **Note** - the Amplify CLI creates and manages its own set of CloudFormation templates in order to quickly configure things such as Cognito, AppSync, and more. This is cool, but I also require other resources and customizations that are not supported out-of-the-box by Amplify's CLI. Rather than try to manually modify the generated Amplify files and hope I don't break something in the process, I opted to separately create my backend using the [AWS SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-install.html) and a non-Amplify CloudFormation template at `./backend/template.yaml`. My frontend still uses AWS Amplify conventions, I'm just not using Amplify to create the backend resources. 
 
 2. **Flashcard Table** - Amazon DynamoDB stores our flashcards with the following schema:
 

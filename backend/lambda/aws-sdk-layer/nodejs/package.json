@@ -1,0 +1,6 @@
+{
+  "name": "aws-sdk-layer",
+  "dependencies": {
+    "aws-sdk": "^2.507.0"
+  }
+}
