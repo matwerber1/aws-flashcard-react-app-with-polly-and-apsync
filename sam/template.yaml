@@ -8,12 +8,10 @@ Description: >
 Parameters:
   PollyOutputBucket:
     Type: String
-    Default: matwerber.info
 
   IamExternalId:
     Type: String
-    Default: flashcard-app-werberm-384u823        # any value, just to prevent unauth access to certain roles
-
+    
 Globals:
   Function:
     Timeout: 3

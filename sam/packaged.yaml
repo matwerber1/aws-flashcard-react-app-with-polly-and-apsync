@@ -11,7 +11,7 @@ Parameters:
     Default: matwerber.info
   IamExternalId:
     Type: String
-    Default: flashcard-app-werberm-384u823
+    Default: flashcard-app-werberm-23423423
 Globals:
   Function:
     Timeout: 3
