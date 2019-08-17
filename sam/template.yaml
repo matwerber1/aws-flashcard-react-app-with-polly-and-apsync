@@ -11,7 +11,10 @@ Parameters:
 
   IamExternalId:
     Type: String
-    
+  
+  GraphqlSchemaLocation:
+    Type: String          # full S3 path to your AppSync schema
+
 Globals:
   Function:
     Timeout: 3
@@ -240,7 +243,7 @@ Resources:
     Type: AWS::AppSync::GraphQLSchema
     Properties: 
       ApiId: !GetAtt GraphqlApi.ApiId
-      DefinitionS3Location: s3://werberm-sandbox/appsync/flashcard-schema.graphql
+      DefinitionS3Location: !Ref GraphqlSchemaLocation
 
   GraphqlDatasource:
     Type: AWS::AppSync::DataSource
