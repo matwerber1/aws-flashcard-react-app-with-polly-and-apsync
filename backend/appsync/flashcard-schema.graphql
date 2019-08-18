@@ -1,42 +1,81 @@
-﻿schema {
-        query: Query
-        mutation: Mutation
-    }
-
-type Mutation {
-    createCard(front_text: String!, back_text: String!): Card
-    deleteCard(card_id: ID!): Card
-    updateCard(
-        card_id: ID!,
-        front_text: String
-        back_text: String
-        back_audio: String
-    ): Card
+﻿type Card {
+	card_id: ID!
+	front_text: String
+	back_text: String
+	back_audio: String
 }
 
-type Query {
-    singleCard(card_id: ID!): Card
-    listCards(filter: ModelCardFilterInput, limit: Int, nextToken: String): ModelCardConnection
+input CreateCardInput {
+	card_id: ID
+	front_text: String
+	back_text: String
+	back_audio: String
 }
 
-type Card {
-    card_id: ID!
-    front_text: String!
-    back_text: String!
-    back_audio: String
+input DeleteCardInput {
+	card_id: ID
+}
+
+input ModelBooleanFilterInput {
+	ne: Boolean
+	eq: Boolean
 }
 
 type ModelCardConnection {
 	items: [Card]
 	nextToken: String
 }
+
 input ModelCardFilterInput {
 	card_id: ModelIDFilterInput
 	front_text: ModelStringFilterInput
 	back_text: ModelStringFilterInput
+	back_audio: ModelStringFilterInput
 	and: [ModelCardFilterInput]
 	or: [ModelCardFilterInput]
 	not: ModelCardFilterInput
+}
+
+input ModelFloatFilterInput {
+	ne: Float
+	eq: Float
+	le: Float
+	lt: Float
+	ge: Float
+	gt: Float
+	contains: Float
+	notContains: Float
+	between: [Float]
+}
+
+input ModelIDFilterInput {
+	ne: ID
+	eq: ID
+	le: ID
+	lt: ID
+	ge: ID
+	gt: ID
+	contains: ID
+	notContains: ID
+	between: [ID]
+	beginsWith: ID
+}
+
+input ModelIntFilterInput {
+	ne: Int
+	eq: Int
+	le: Int
+	lt: Int
+	ge: Int
+	gt: Int
+	contains: Int
+	notContains: Int
+	between: [Int]
+}
+
+enum ModelSortDirection {
+	ASC
+	DESC
 }
 
 input ModelStringFilterInput {
@@ -52,15 +91,34 @@ input ModelStringFilterInput {
 	beginsWith: String
 }
 
-input ModelIDFilterInput {
-	ne: ID
-	eq: ID
-	le: ID
-	lt: ID
-	ge: ID
-	gt: ID
-	contains: ID
-	notContains: ID
-	between: [ID]
-	beginsWith: ID
+type Mutation {
+	createCard(input: CreateCardInput!): Card
+	updateCard(input: UpdateCardInput!): Card
+	deleteCard(input: DeleteCardInput!): Card
+}
+
+type Query {
+	getCard(card_id: ID!): Card
+	listCards(filter: ModelCardFilterInput, limit: Int, nextToken: String): ModelCardConnection
+}
+
+type Subscription {
+	onCreateCard: Card
+		@aws_subscribe(mutations: ["createCard"])
+	onUpdateCard: Card
+		@aws_subscribe(mutations: ["updateCard"])
+	onDeleteCard: Card
+		@aws_subscribe(mutations: ["deleteCard"])
+}
+
+input UpdateCardInput {
+	card_id: ID!
+	front_text: String
+	back_text: String
+	back_audio: String
+}
+
+schema {
+	query: Query
+	mutation: Mutation
 }

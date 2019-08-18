@@ -21,9 +21,45 @@ const CardList = (props) => {
         );
     };
 
-    return (
+/*
+
+        <div className="card-list">
+             <Connect query={graphqlOperation(queries.listTodos)}>
+                {({ data: {listTodos}, loading, error }) => {
+                    console.log(`listCards: ${JSON.stringify(listTodos)}, loading: ${loading}, error: ${error}`);
+                    if (error) return (<h3>Error loading cards</h3>);
+                    if (loading || !listTodos) return (<h3>Loading cards...</h3>);
+                    return (<div>derp</div>);
+                    //return (<CardView cards={listCards.items} />);
+                }}
+            </Connect>
+        </div>
+
         <div className="card-list">
              <Connect query={graphqlOperation(queries.listCards)}>
+                {({ data: {listCards}, loading, error }) => {
+                    console.log(`listCards: ${JSON.stringify(listCards)}, loading: ${loading}, error: ${error}`);
+                    if (error) return (<h3>Error loading cards</h3>);
+                    if (loading || !listCards) return (<h3>Loading cards...</h3>);
+                    return (<div>derp</div>);
+                    //return (<CardView cards={listCards.items} />);
+                }}
+            </Connect>
+        </div>
+
+        <div className="card-list">
+             <Connect query={graphqlOperation(queries.listCards)}>
+                {({ data, loading, error }) => {
+                    console.log(`listCards: ${JSON.stringify(data)}, loading: ${loading}, error: ${error}`);
+                    if (error) return (<h3>Error loading cards</h3>);
+                    if (loading || !data) return (<h3>Loading cards...</h3>);
+                    return (<div>derp</div>);
+                    //return (<CardView cards={listCards.items} />);
+                }}
+            </Connect>
+        </div>
+
+                     <Connect query={graphqlOperation(queries.listCards)}>
                 {({ data: {listCards}, loading, error }) => {
                     console.log(`listCards: ${JSON.stringify(listCards)}, loading: ${loading}, error: ${error}`);
                     if (error) return (<h3>Error loading cards</h3>);
@@ -31,6 +67,21 @@ const CardList = (props) => {
                     return (<CardView cards={listCards.items} />);
                 }}
             </Connect>
+        */
+
+    return (
+        <div className="card-list">
+ <div className="card-list">
+             <Connect query={graphqlOperation(queries.listCards)}>
+                {({ data, loading, error }) => {
+                    console.log(`listCards: ${JSON.stringify(data)}, loading: ${loading}, error: ${error}`);
+                    if (error) return (<h3>Error loading cards</h3>);
+                    if (loading || !data) return (<h3>Loading cards...</h3>);
+                    return (<div>derp</div>);
+                    //return (<CardView cards={listCards.items} />);
+                }}
+            </Connect>
+        </div>
         </div>
     );
 };

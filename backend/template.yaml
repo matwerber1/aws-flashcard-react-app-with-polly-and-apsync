@@ -293,6 +293,8 @@ Resources:
                 - dynamodb:Query
                 - dynamodb:Scan
                 - dynamodb:UpdateItem
+                - dynamodb:BatchGetItem
+                - dynamodb:BatchWriteItem
               Resource:
                 - !Sub "${FlashcardTable.Arn}"
                 - !Sub "${FlashcardTable.Arn}/*"
@@ -326,9 +328,14 @@ Resources:
         #end
         $util.toJson($ListRequest)
       ResponseMappingTemplate: |
-        $util.toJson($ctx.result)
+        {
+            "items": $utils.toJson($context.result.items)
+            #if( ${context.result.nextToken} )
+                ,"nextToken": "${context.result.nextToken}"
+            #end
+        }
 
-  GraphqlSingleCardQueryResolver:
+  GraphqlGetCardQueryResolver:
     Type: AWS::AppSync::Resolver
     DependsOn: GraphqlSchema
     Properties: 
@@ -336,14 +343,14 @@ Resources:
       DataSourceName: !GetAtt GraphqlDatasource.Name
       Kind: UNIT
       TypeName: Query
-      FieldName: singleCard
+      FieldName: getCard
       RequestMappingTemplate: |
         {
           "version": "2017-02-28",
           "operation": "GetItem",
-          "key": {
-            "card_id": $util.dynamodb.toDynamoDBJson($ctx.args.card_id),
-          }
+          "key": #if( $modelObjectKey ) $util.toJson($modelObjectKey) #else {
+          "card_id": $util.dynamodb.toDynamoDBJson($ctx.args.card_id)
+        } #end
         }
       ResponseMappingTemplate: |
         $util.toJson($ctx.result)
