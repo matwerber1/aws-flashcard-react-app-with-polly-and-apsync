@@ -44,3 +44,17 @@ This is a work in process, not currently ready / working.
 10. **Polly Synthesis SNS Topic** - this SNS topic recieves notification mesasages when Polly completes a speech synthesis task. 
 
 11. **Handle Polly SNS Messages Function** - this function is subscribed to the Polly Synthesis SNS topic. When this function receives notification of a successfully-synthesized message, this function sets the **back_audio_ready** attribute to `true` in the flashcard table.
+
+
+# Workflow
+
+## Card created
+
+1. User creates card in front-end UI which is passed as mutation to AppSync
+2. AppSync creates a card record in **flashcard-table** (DynamoDB)
+3. DDB stream sends change to **ddb-stream-processor** (Lambda)
+4. **ddb-stream-processor**  checks event record type, and if type is INSERT, submits a message to the **PollySynthesisQueue** (SQS) that contains the card ID and text to synthesize
+6. **polly-synthesis-queue-worker** reads items off the queue and submits them to Polly; upon submission, Polly returns the S3 key to which it will save results; the queue worker makes an AppSync mutation to update the **flashcard-table** with the path to the synthesized task and the synthesis status to PENDING.
+7. Polly completes synthesis job and sends notification to **PollySynthesisTopic** (SNS)
+9. **PollySynthesisTopic** invokes the subscribed **PollySnsHandler** function (Lambda)
+10. **PollySnsHandler** makes AppSync mutation to update **flashcard-table** synthesis status to DONE for card in question
