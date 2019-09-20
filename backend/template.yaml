@@ -130,6 +130,7 @@ Resources:
       CodeUri: lambda/submit-polly-synthesis-task/
       Handler: app.handler
       Runtime: nodejs8.10
+      Tracing: Active
       Layers:
         - !Ref AppSyncLayer
       Environment:
