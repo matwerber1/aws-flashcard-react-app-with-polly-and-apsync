@@ -1,15 +1,15 @@
 ﻿type Card {
+	back_audio: String
+	back_text: String
 	card_id: ID!
 	front_text: String
-	back_text: String
-	back_audio: String
 }
 
 input CreateCardInput {
+	back_audio: String
+	back_text: String
 	card_id: ID
 	front_text: String
-	back_text: String
-	back_audio: String
 }
 
 input DeleteCardInput {
@@ -17,8 +17,8 @@ input DeleteCardInput {
 }
 
 input ModelBooleanFilterInput {
-	ne: Boolean
 	eq: Boolean
+	ne: Boolean
 }
 
 type ModelCardConnection {
@@ -27,50 +27,50 @@ type ModelCardConnection {
 }
 
 input ModelCardFilterInput {
+	and: [ModelCardFilterInput]
+	back_audio: ModelStringFilterInput
+	back_text: ModelStringFilterInput
 	card_id: ModelIDFilterInput
 	front_text: ModelStringFilterInput
-	back_text: ModelStringFilterInput
-	back_audio: ModelStringFilterInput
-	and: [ModelCardFilterInput]
-	or: [ModelCardFilterInput]
 	not: ModelCardFilterInput
+	or: [ModelCardFilterInput]
 }
 
 input ModelFloatFilterInput {
-	ne: Float
+	between: [Float]
+	contains: Float
 	eq: Float
-	le: Float
-	lt: Float
 	ge: Float
 	gt: Float
-	contains: Float
+	le: Float
+	lt: Float
+	ne: Float
 	notContains: Float
-	between: [Float]
 }
 
 input ModelIDFilterInput {
-	ne: ID
+	beginsWith: ID
+	between: [ID]
+	contains: ID
 	eq: ID
-	le: ID
-	lt: ID
 	ge: ID
 	gt: ID
-	contains: ID
+	le: ID
+	lt: ID
+	ne: ID
 	notContains: ID
-	between: [ID]
-	beginsWith: ID
 }
 
 input ModelIntFilterInput {
-	ne: Int
+	between: [Int]
+	contains: Int
 	eq: Int
-	le: Int
-	lt: Int
 	ge: Int
 	gt: Int
-	contains: Int
+	le: Int
+	lt: Int
+	ne: Int
 	notContains: Int
-	between: [Int]
 }
 
 enum ModelSortDirection {
@@ -79,22 +79,22 @@ enum ModelSortDirection {
 }
 
 input ModelStringFilterInput {
-	ne: String
+	beginsWith: String
+	between: [String]
+	contains: String
 	eq: String
-	le: String
-	lt: String
 	ge: String
 	gt: String
-	contains: String
+	le: String
+	lt: String
+	ne: String
 	notContains: String
-	between: [String]
-	beginsWith: String
 }
 
 type Mutation {
 	createCard(input: CreateCardInput!): Card
-	updateCard(input: UpdateCardInput!): Card
 	deleteCard(input: DeleteCardInput!): Card
+	updateCard(input: UpdateCardInput!): Card
 }
 
 type Query {
@@ -105,17 +105,17 @@ type Query {
 type Subscription {
 	onCreateCard: Card
 		@aws_subscribe(mutations: ["createCard"])
-	onUpdateCard: Card
-		@aws_subscribe(mutations: ["updateCard"])
 	onDeleteCard: Card
 		@aws_subscribe(mutations: ["deleteCard"])
+	onUpdateCard: Card
+		@aws_subscribe(mutations: ["updateCard"])
 }
 
 input UpdateCardInput {
+	back_audio: String
+	back_text: String
 	card_id: ID!
 	front_text: String
-	back_text: String
-	back_audio: String
 }
 
 schema {
