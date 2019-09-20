@@ -153,3 +153,6 @@ $RECYCLE.BIN/
 *.lnk
 
 node_modules/
+test-cards.js
+backup*
+!node_modules/appsync-flashcard-helper/index.js
