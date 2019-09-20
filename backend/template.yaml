@@ -44,6 +44,7 @@ Resources:
       CodeUri: lambda/ddb-stream-processor/
       Handler: app.handler
       Runtime: nodejs8.10
+      Tracing: Active
       Environment:
         Variables:
           POLLY_SQS_QUEUE: !Ref PollySynthesisQueue
@@ -209,6 +210,7 @@ Resources:
       CodeUri: lambda/handle-polly-sns-message/
       Handler: app.handler
       Runtime: nodejs8.10
+      Tracing: Active
       Environment:
         Variables:
           FLASHCARD_TABLE: !Ref FlashcardTable
