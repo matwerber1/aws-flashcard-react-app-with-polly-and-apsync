@@ -1,7 +1,7 @@
 {
   "name": "ddb-stream-processor",
   "version": "1.0.0",
-  "main": "app.js",
+  "main": "index.js",
   "license": "ISC",
   "dependencies": {
     "aws-xray-sdk-core": "^2.3.6"
