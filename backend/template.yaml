@@ -130,6 +130,8 @@ Resources:
       CodeUri: lambda/submit-polly-synthesis-task/
       Handler: app.handler
       Runtime: nodejs8.10
+      Layers:
+        - !Ref AppSyncLayer
       Environment:
         Variables:
           POLLY_SQS_QUEUE: !Ref PollySynthesisQueue
@@ -211,6 +213,8 @@ Resources:
       Handler: app.handler
       Runtime: nodejs8.10
       Tracing: Active
+      Layers:
+        - !Ref AppSyncLayer
       Environment:
         Variables:
           FLASHCARD_TABLE: !Ref FlashcardTable
@@ -232,6 +236,18 @@ Resources:
   ##############################################################################
   # AppSync & GraphQL API
   ##############################################################################
+  AppSyncLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: appsync-flaschard-node-layer
+      Description: Contains a layer to support AppSync in Node
+      ContentUri: lambda/appsync-flashcard-helper-layer/
+      CompatibleRuntimes:
+        - nodejs10.x
+        - nodejs8.10
+      LicenseInfo: 'ISC'
+      RetentionPolicy: Retain
+  
   GraphqlApi:
     Type: AWS::AppSync::GraphQLApi
     Properties: 
