@@ -7,7 +7,6 @@ import Amplify from 'aws-amplify';
 import awsconfig from './amplify-config.js';
 Amplify.configure(awsconfig);
 
-
 function App(props) {
   return (
     <div className="App">
@@ -21,9 +20,10 @@ function App(props) {
 function Header() {
     return (
         <header className="App-header">
-            Derp
+            Quiz
         </header>
     );
 }
 
 export default withAuthenticator(App);
+//export default (App);
