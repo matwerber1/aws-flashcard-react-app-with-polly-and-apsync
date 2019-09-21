@@ -1,13 +1,9 @@
-if (process.env.AWS_SAM_LOCAL) {
-  AWS = require('aws-sdk');
-  } else {
-  // Only run AWS X-Ray when NOT running AWS SAM Local
-  AWSXRay = require('aws-xray-sdk-core');
-  AWS = AWSXRay.captureAWS(require('aws-sdk'));
-}
+const AWSXRay = require('aws-xray-sdk');
+const AWS = AWSXRay.captureAWS(require('aws-sdk'));
+const validate = require('jsonschema').validate;
+const AppSyncHelper = require('appsync-flashcard-helper');
+const appSyncClient = getAppSyncHelper();
 const sqs = new AWS.SQS();
-const POLLY_SQS_QUEUE = process.env.POLLY_SQS_QUEUE;
-var validate = require('jsonschema').validate;
 
 const ACTIONS = {
     CREATE_CARD: 'createCard',
@@ -35,12 +31,16 @@ exports.handler = async (event, context) => {
           throw new Error('Invalid card schema');
         }
         else {
-          await submitCardBackTextToPolly(
+          await submitCardBackTextToPollyQueue(
             ACTIONS.CREATE_CARD,
             newImage.card_id,
             newImage.front_text,
             newImage.back_text
           );
+          await appSyncClient.updateCard({
+            card_id: newImage.card_id,
+            back_audio_status: "QUEUED"
+          });
         }
       }
 
@@ -96,7 +96,7 @@ function cardSchemaIsValid(card) {
 }
 
 
-async function submitCardBackTextToPolly(action, card_id, front_text, back_text) {
+async function submitCardBackTextToPollyQueue(action, card_id, front_text, back_text) {
     /*
         message_type:       string        [required]
         card_id:            string        [required]
@@ -119,7 +119,7 @@ async function submitCardBackTextToPolly(action, card_id, front_text, back_text)
     );
     var params = {
         MessageBody: message_body,
-        QueueUrl: POLLY_SQS_QUEUE,
+        QueueUrl: process.env.POLLY_SQS_QUEUE,
         DelaySeconds: 15,
         MessageAttributes: {
           'action': {
@@ -131,4 +131,17 @@ async function submitCardBackTextToPolly(action, card_id, front_text, back_text)
     await sqs.sendMessage(params).promise();
     console.log('Card submitted!');
     return;
+}
+
+
+//------------------------------------------------------------------------------
+function getAppSyncHelper() {
+  return new AppSyncHelper({
+    url: process.env.APPSYNC_ENDPOINT,         
+    region: process.env.AWS_REGION,      
+    auth_type: 'AWS_IAM',   
+    accessKey:  process.env.AWS_ACCESS_KEY_ID,    
+    secretKey: process.env.AWS_SECRET_ACCESS_KEY,   
+    sessionToken: process.env.AWS_SESSION_TOKEN
+  });
 }

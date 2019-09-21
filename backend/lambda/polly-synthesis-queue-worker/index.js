@@ -1,31 +1,14 @@
-if (process.env.AWS_SAM_LOCAL) {
-  AWS = require('aws-sdk');
-  } else {
-  // Only run AWS X-Ray when NOT running AWS SAM Local
-  AWSXRay = require('aws-xray-sdk-core');
-  AWS = AWSXRay.captureAWS(require('aws-sdk'));
-}
-
-const AppSyncHelper = require('appsync-flashcard-helper');
+const AWSXRay = require('aws-xray-sdk');
+const AWS = AWSXRay.captureAWS(require('aws-sdk'));
 const polly = new AWS.Polly();
 const sqs = new AWS.SQS();
+const AppSyncHelper = require('appsync-flashcard-helper');
+const appSyncClient = getAppSyncHelper();
 
-const POLLY_OUTPUT_BUCKET = process.env.POLLY_OUTPUT_BUCKET;
-const POLLY_SNS_TOPIC = process.env.POLLY_SNS_TOPIC;
-const APPSYNC_ENDPOINT = process.env.APPSYNC_ENDPOINT;
 const ACTIONS = {
     CREATE_CARD: 'createCard',
     UPDATE_CARD: 'updateCard'
 };
-
-var appSyncClient = new AppSyncHelper({
-  url: APPSYNC_ENDPOINT,         
-  region: process.env.AWS_REGION,      
-  auth_type: 'AWS_IAM',   
-  accessKey:  process.env.AWS_ACCESS_KEY_ID,    
-  secretKey: process.env.AWS_SECRET_ACCESS_KEY,   
-  sessionToken: process.env.AWS_SESSION_TOKEN
-});
 
 
 //------------------------------------------------------------------------------
@@ -39,8 +22,12 @@ exports.handler = async (event, context) => {
       var action = r.messageAttributes.action.stringValue;
       switch (action) {
         case ACTIONS.CREATE_CARD:
-          var back_audio_uri = await submitBackTextToPolly(back_text);
-          await updateBackAudioUriInTable(card_id, back_audio_uri);
+          var response = await submitBackTextToPolly(card_id, back_text);
+          await updateBackAudioUriInTable(
+            card_id,
+            response.TaskId,
+            response.OutputUri
+          );
           break;
         case ACTIONS.UPDATE_CARD:
           break;
@@ -83,7 +70,7 @@ async function deleteMessageFromQueue(receiptHandle, queueArn) {
 }
 
 //------------------------------------------------------------------------------
-async function submitBackTextToPolly(back_text) {
+async function submitBackTextToPolly(card_id, back_text) {
 
     back_text = `
         <speak><amazon:domain name="news">
@@ -92,30 +79,45 @@ async function submitBackTextToPolly(back_text) {
     `;
     var params = {
         OutputFormat: 'mp3',
-        OutputS3BucketName: POLLY_OUTPUT_BUCKET,
+        OutputS3BucketName: process.env.POLLY_OUTPUT_BUCKET,
         Text: back_text,
         VoiceId: 'Matthew',
         Engine: 'neural',
         LanguageCode: 'en-US',
-        OutputS3KeyPrefix: 'flashcards/',
-        SnsTopicArn: POLLY_SNS_TOPIC,
+        OutputS3KeyPrefix: `flashcards/${card_id}`,
+        SnsTopicArn: process.env.POLLY_SNS_TOPIC,
         TextType: 'ssml'
     };
     console.log('Creating Polly speech synthesis task...');
     var response = await polly.startSpeechSynthesisTask(params).promise();
     console.log('Synthesis task submitted:\n' + JSON.stringify(response));
-    return response.SynthesisTask.OutputUri;
+    return response.SynthesisTask;
 }
 
 
 //------------------------------------------------------------------------------
-async function updateBackAudioUriInTable(card_id, back_audio) {
+async function updateBackAudioUriInTable(card_id, task_id, back_audio) {
 
   var updateVariables = {
     card_id: card_id, 
-    back_audio: back_audio
+    back_audio: back_audio,
+    back_audio_task_id: task_id,
+    back_audio_status: "SYNTHESIS_IN_PROCESS"
   };
   console.log('Sending mutation to update card...');
   var response = await appSyncClient.updateCard(updateVariables);
   console.log('Mutation response: ', JSON.stringify(response, null, 2));
+}
+
+
+//------------------------------------------------------------------------------
+function getAppSyncHelper() {
+  return new AppSyncHelper({
+    url: process.env.APPSYNC_ENDPOINT,         
+    region: process.env.AWS_REGION,      
+    auth_type: 'AWS_IAM',   
+    accessKey:  process.env.AWS_ACCESS_KEY_ID,    
+    secretKey: process.env.AWS_SECRET_ACCESS_KEY,   
+    sessionToken: process.env.AWS_SESSION_TOKEN
+  });
 }

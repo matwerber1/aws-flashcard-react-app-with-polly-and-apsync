@@ -49,7 +49,7 @@ Resources:
             - 
               AttributeName: "back_audio_task_id"
               KeyType: "HASH"
-
+          
   DdbStreamProcessor:
     Type: AWS::Serverless::Function
     Properties:
@@ -62,6 +62,7 @@ Resources:
       Environment:
         Variables:
           POLLY_SQS_QUEUE: !Ref PollySynthesisQueue
+          APPSYNC_ENDPOINT: !GetAtt GraphqlApi.GraphQLUrl
       Events: 
         ProcessStreamEvent:
           Type: DynamoDB
@@ -135,7 +136,7 @@ Resources:
       ReceiveMessageWaitTimeSeconds: 20    # long polling
       VisibilityTimeout: 30
 
-  SubmitPollySynthesisTaskFunction:
+  PollySynthesisQueueWorker:
     # Function receives text from SQS queue and submits to Polly for synthesis.
     # If submission successful, function then updates DynamoDB Flashcard table
     # with the (to-be created) S3 output file.
@@ -221,7 +222,7 @@ Resources:
     Type: AWS::SNS::Topic
     Properties: {}
 
-  PollySynthesisSnsTopicHandler:
+  PollySnsHandler:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: lambda/polly-sns-handler/
@@ -232,7 +233,7 @@ Resources:
         - !Ref AppSyncLayer
       Environment:
         Variables:
-          FLASHCARD_TABLE: !Ref FlashcardTable
+          APPSYNC_ENDPOINT: !GetAtt GraphqlApi.GraphQLUrl
       Events:
         SynthesisSnsEvent:
           Type: SNS
@@ -246,7 +247,16 @@ Resources:
             Action:
               - dynamodb:*
             Resource: 
-              - !GetAtt FlashcardTable.Arn
+              - !Sub "${FlashcardTable.Arn}"
+              - !Sub "${FlashcardTable.Arn}/*"
+        - Statement:
+          - 
+            Sid: AppsyncPermission
+            Effect: Allow
+            Action:
+              - appsync:GraphQL
+            Resource: 
+              - !Sub "${GraphqlApi.Arn}/*"
 
   ##############################################################################
   # AppSync & GraphQL API
@@ -367,6 +377,30 @@ Resources:
                 ,"nextToken": "${context.result.nextToken}"
             #end
         }
+
+  GetCardIdsByBackAudioTaskId:
+    Type: AWS::AppSync::Resolver
+    DependsOn: GraphqlSchema
+    Properties: 
+      ApiId: !GetAtt GraphqlApi.ApiId
+      DataSourceName: !GetAtt GraphqlDatasource.Name
+      Kind: UNIT
+      TypeName: Query
+      FieldName: getCardIdsByBackAudioTaskId
+      RequestMappingTemplate: |
+        {
+          "version": "2017-02-28",
+          "operation": "Query",
+          "index": "PollyBackTextSynthesisIndex",
+          "query" : {
+          "expression" : "back_audio_task_id = :taskId",
+            "expressionValues" : {
+                ":taskId" : $util.dynamodb.toDynamoDBJson($ctx.args.back_audio_task_id)
+            }
+          }
+        }
+      ResponseMappingTemplate: |
+        $util.toJson($ctx.result)
 
   GraphqlGetCardQueryResolver:
     Type: AWS::AppSync::Resolver

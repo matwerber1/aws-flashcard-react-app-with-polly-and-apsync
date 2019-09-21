@@ -1,0 +1,22 @@
+{
+  "Records": [
+      {
+          "EventSource": "aws:sns",
+          "EventVersion": "1.0",
+          "EventSubscriptionArn": "arn:aws:sns:us-east-1:544941453660:flashcardApp-PollySynthesisTopic-1S3HX6YAUPLLH:62d9f268-7f35-4640-9b5f-1c6f2a0ded45",
+          "Sns": {
+              "Type": "Notification",
+              "MessageId": "2be56d04-de90-5f94-8895-3b0448aa39b1",
+              "TopicArn": "arn:aws:sns:us-east-1:544941453660:flashcardApp-PollySynthesisTopic-1S3HX6YAUPLLH",
+              "Subject": "SynthesisTaskNotification { TaskId: cd97f20a-45a4-4548-b8bf-356e62868064, Status: COMPLETED }",
+              "Message": "{\"taskId\":\"cd97f20a-45a4-4548-b8bf-356e62868064\",\"taskStatus\":\"COMPLETED\",\"outputUri\":\"s3://matwerber.info/flashcards/card_123.cd97f20a-45a4-4548-b8bf-356e62868064.mp3\",\"creationTime\":\"2019-09-21T21:19:39.607Z\",\"requestCharacters\":17,\"snsTopicArn\":\"arn:aws:sns:us-east-1:544941453660:flashcardApp-PollySynthesisTopic-1S3HX6YAUPLLH\",\"outputFormat\":\"Mp3\",\"textType\":\"Ssml\",\"voiceId\":\"Matthew\"}",
+              "Timestamp": "2019-09-21T21:19:54.851Z",
+              "SignatureVersion": "1",
+              "Signature": "mhiUbnodClSzwW+Jw8hZJZovpLDU+3PytPg2oELcXKw1D7m+VPHv/Jd1AJBHRCBsrkK3UyUcmuX+m3XGJY8FySrXKgVzlg42zz20RB8zoK+Ii6cvnN3qGIe8puHDH8NHxE/4xQBolefvnIMEWbdZ6B4yAZed0+ogD0+iuVZAJXXmj7JsDX8qkySyNJKcHIVgIKojqcGojn8K7NnF0tg9YL829UuOjUo7Fs+lcksu8VVy/jvreyKg+XnDHRl8EQ2Yx7KKAm6cgSUAKHrF8NHtjgSJr9B6UgmLnm386SoAsT73wNW6At5KED/7eVpyojzNNcvgpFah++TIUQMUbT0zdA==",
+              "SigningCertUrl": "https://sns.us-east-1.amazonaws.com/SimpleNotificationService-6aad65c2f9911b05cd53efda11f913f9.pem",
+              "UnsubscribeUrl": "https://sns.us-east-1.amazonaws.com/?Action=Unsubscribe&SubscriptionArn=arn:aws:sns:us-east-1:544941453660:flashcardApp-PollySynthesisTopic-1S3HX6YAUPLLH:62d9f268-7f35-4640-9b5f-1c6f2a0ded45",
+              "MessageAttributes": {}
+          }
+      }
+  ]
+}

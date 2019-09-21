@@ -1,15 +1,15 @@
 {
   "Records": [
       {
-          "messageId": "07bd269e-8369-4cd2-89fb-062c36df250a",
-          "receiptHandle": "AQEBJ+f7hyX+RzfbkhAvOTPx93h60HGOBeWAK2NdZpXe9agWwwfxSqv2gLvXyGg9/Af5gkLONVR+86ZhVK96sinGoHwoWbSm7Gm/FP3GTumJWDDszJJtdJkBw9S/QqS3f9v9gncgHqzbWU2CnYM+Cw3b8UAOIPibwVHQ1jurD0RqWXNcl2CW99Vn4ZgNhv9aoRUiI+A1NCiPAe0ezDO5lfrX4391JPnquHAe/a58YSRl94q5RZ13ggyE4Ov52zgZ09Phy0kTxvtVfNY346r58TkbF66u51kWDRqHLxCH01+LhJj830ND9MFC9eQkpnT/beeMZuyFeW3Uar5yQqBumvb/CoqpEppVLAco91lx2a5J9zD2YS/LxZKpq2ebJyCx8wTbIC2VHvGEWWYGkmlwm0Mzdbx94MdGid29Exyp5oGZJEfM3OE+iEKrF1y4fDqQaV+U",
-          "body": "{\"card_id\":\"test2\",\"front_text\":\"the front\",\"back_text\":\"the back\"}",
+          "messageId": "436d3a01-8020-402c-a600-87785e97ab63",
+          "receiptHandle": "AQEBX99qyvRkTFinMiPvt+xxbPR2F8jl1OGXw0ACrV9Wqt7/XSsupxdeBfGyVW91LoU7M53XZNPBNghxrWGGOQ76JRneK1DEn5tbHWfW3siCfY82EChS2lJSOphoA0wniIEXVvR18GUw7lLSb2gRkOrseMsS8wUpINsQzk+0EjVDpmyY6+bOWaw8RywI1a21puEVc9IqiHyAywQbl4VfbJXoYWH9wSmOyaE3rZdQM1qsWc6gDdR9zTbe2bQSPubBkbQrfZtbuS9oo7szEjOu+dsAtq+3Mt72aWFEk/u0sroaNn4PbDfOjIkr2mu/be+f317PZbkaDXuLXLEulbHHcg/LO2wzeoU8K2Q95fr4C+tRiKZ/BfgY4AP4IhgYHHdDqK5x9yF7Xjze2zM20qIsdDpzKr6mzkBmRLrZ/2mbMmy5nP/hTUALjE/KNRdt+7xqYm9N",
+          "body": "{\"card_id\":\"card_123\",\"front_text\":\"this is the front!\",\"back_text\":\"this is the back!\"}",
           "attributes": {
               "ApproximateReceiveCount": "1",
-              "AWSTraceHeader": "Root=1-5d840f72-5a936fa2864b3c37fe1152f6;Parent=2a8dbedb4613fe36;Sampled=1",
-              "SentTimestamp": "1568935796125",
+              "AWSTraceHeader": "Root=1-5d868d77-83378a3cd10454f1848df655;Parent=c2e111ea2fe11478;Sampled=1",
+              "SentTimestamp": "1569099792069",
               "SenderId": "AROAX5YIKWFOAJEXEPWCM:flashcardApp-DdbStreamProcessor-15UCLNRZDZ3LD",
-              "ApproximateFirstReceiveTimestamp": "1568935811125"
+              "ApproximateFirstReceiveTimestamp": "1569099807069"
           },
           "messageAttributes": {
               "action": {
@@ -20,7 +20,7 @@
               }
           },
           "md5OfMessageAttributes": "5b0f8d936439943600b9730868d0fec2",
-          "md5OfBody": "13d6d68207246a661458e2221673a1fe",
+          "md5OfBody": "a18e485c43d095e8920d97a77280aea7",
           "eventSource": "aws:sqs",
           "eventSourceARN": "arn:aws:sqs:us-east-1:544941453660:flashcardApp-PollySynthesisQueue-3JWSQZ2NXVIH",
           "awsRegion": "us-east-1"
