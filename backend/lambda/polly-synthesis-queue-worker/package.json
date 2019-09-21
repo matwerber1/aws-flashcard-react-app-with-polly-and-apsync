@@ -1,8 +1,0 @@
-{
-  "dependencies": {
-    "aws-appsync": "^2.0.0",
-    "aws-xray-sdk-core": "^2.3.6",
-    "cross-fetch": "^3.0.4",
-    "graphql-tag": "^2.10.1"
-  }
-}
