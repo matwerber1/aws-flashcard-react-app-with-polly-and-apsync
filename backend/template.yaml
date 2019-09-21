@@ -28,7 +28,10 @@ Resources:
     Properties: 
       AttributeDefinitions: 
         - 
-          AttributeName: "card_id"
+          AttributeName: "card_id"              # our main reads and writes
+          AttributeType: "S"
+        -
+          AttributeName: "back_audio_task_id"   # used for updating Polly synthesis status
           AttributeType: "S"
       KeySchema: 
         - 
@@ -37,6 +40,15 @@ Resources:
       BillingMode: PAY_PER_REQUEST
       StreamSpecification: 
         StreamViewType: NEW_AND_OLD_IMAGES
+      GlobalSecondaryIndexes:
+        - 
+          IndexName: PollyBackTextSynthesisIndex
+          Projection:
+            ProjectionType: KEYS_ONLY
+          KeySchema:
+            - 
+              AttributeName: "back_audio_task_id"
+              KeyType: "HASH"
 
   DdbStreamProcessor:
     Type: AWS::Serverless::Function
@@ -45,6 +57,8 @@ Resources:
       Handler: index.handler
       Runtime: nodejs8.10
       Tracing: Active
+      Layers:
+        - !Ref AppSyncLayer
       Environment:
         Variables:
           POLLY_SQS_QUEUE: !Ref PollySynthesisQueue
