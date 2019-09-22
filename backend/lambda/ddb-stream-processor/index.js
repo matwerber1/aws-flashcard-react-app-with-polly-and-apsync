@@ -4,6 +4,7 @@ const validate = require('jsonschema').validate;
 const AppSyncHelper = require('appsync-flashcard-helper');
 const appSyncClient = getAppSyncHelper();
 const sqs = new AWS.SQS();
+const s3 = new AWS.S3();
 
 const ACTIONS = {
     CREATE_CARD: 'createCard',
@@ -15,6 +16,7 @@ exports.handler = async (event, context) => {
   
   var processed_records = 0;
   var skipped_records = 0;
+  var errored_records = 0;
 
   for (const record of event.Records) {
     try {
@@ -22,36 +24,46 @@ exports.handler = async (event, context) => {
       console.log(record.eventName);
       console.log('DynamoDB Record: %j', record.dynamodb);  
       record.dynamodb = getUnmarshalledDynamoDBRecord(record.dynamodb);
-      AWSXRay.captureFunc('annotations', function(subsegment){
-        subsegment.addAnnotation('Card ID', record.dynamodb.Keys.card_id);
-      });
-      if (record.eventName === 'INSERT') {
-        var newImage = record.dynamodb.NewImage;
-        if (!cardSchemaIsValid(newImage)) {
-          throw new Error('Invalid card schema');
-        }
-        else {
-          await submitCardBackTextToPollyQueue(
-            ACTIONS.CREATE_CARD,
-            newImage.card_id,
-            newImage.front_text,
-            newImage.back_text
-          );
-          await appSyncClient.updateCard({
-            card_id: newImage.card_id,
-            back_audio_status: "QUEUED"
-          });
-        }
-      }
 
-      processed_records += 1;
+      switch (record.eventName) {
+        case "INSERT":
+          var newImage = record.dynamodb.NewImage;
+          await submitCardBackTextToPollyQueue(ACTIONS.CREATE_CARD, newImage);
+          processed_records += 1;
+          break;
+        
+        case "REMOVE":
+          var oldImage = record.dynamodb.OldImage;
+          await deleteAudioFromS3(oldImage);
+          processed_records += 1;
+          break;
+        
+        case "MODIFY":
+          var oldImage = record.dynamodb.OldImage;
+          var newImage = record.dynamodb.NewImage;
+          if (oldImage.hasOwnProperty("back_text") && newImage.hasOwnProperty("back_text")) {
+            if (oldImage.back_text !== newImage.back_text) {
+              console.log('Card text has changed. Deleting old text and submitting new text to Polly...');
+              await deleteAudioFromS3(oldImage);
+              await submitCardBackTextToPollyQueue(ACTIONS.CREATE_CARD, newImage);
+            }
+            else {
+              console.log('Card text did not change, nothing left to do.');
+            }
+          }
+          processed_records += 1;
+          break;
+        
+        default:
+          throw new Error(`Unsupported event type ${record.eventName}`);
+      }
     }
     catch (err) {
       console.log('Error: unable to process record: ', err.message);
-      skipped_records += 1;
+      errored_records += 1;
     }
   }
-  return `${processed_records} successfully processed, ${skipped_records} skipped records`;
+  return `Records: ${processed_records} processed, ${skipped_records} skipped, ${errored_records} errors`;
 };
 
 //------------------------------------------------------------------------------
@@ -70,8 +82,14 @@ function getUnmarshalledDynamoDBRecord(record) {
 };
 
 
+function getBucketAndKeyFromS3Uri(uri) {
+  var s3_url_regex = /https:\/\/s3.[a-z0-9\-]+.amazonaws.com\//;
+  var [bucket, key] = uri.split(s3_url_regex)[1].split(/\/(.+)/);
+  return [bucket, key];
+}
+
 //------------------------------------------------------------------------------
-function cardSchemaIsValid(card) {
+function validateCardSchema(card) {
 
   var schema = {
     id: "/Card",
@@ -87,35 +105,50 @@ function cardSchemaIsValid(card) {
   var errors = validate(card, schema).errors;
 
   if (errors.length > 0) {
-    console.log('DynamoDB has schema errors: ', JSON.stringify(errors, null, 2));
-    return false;
+    throw new Error('DynamoDB record schema errors: ', JSON.stringify(errors, null, 2));
   }
   else {
-      return true;
+    console.log('DynamoDB schema is valid.');
+    return;
   }
 }
 
 
-async function submitCardBackTextToPollyQueue(action, card_id, front_text, back_text) {
-    /*
-        message_type:       string        [required]
-        card_id:            string        [required]
-        back_text:          string        [required]
-        old_audio_s3_path:  string
+//------------------------------------------------------------------------------
+async function deleteAudioFromS3(card) {
 
-        message_type: 
-            Should be "NEW" or "REPLACE"
+  console.log('Preparing to delete audio from S3...');
+  if (card.hasOwnProperty('back_audio')) {
+    var [bucket, key] = getBucketAndKeyFromS3Uri(card.back_audio);
+    await s3.deleteObject({
+      Bucket: bucket,
+      Key: key
+    }).promise();
+    console.log(`Audio deleted.`);
+    await appSyncClient.updateCard({
+      card_id: card.card_id,
+      back_audio_status: "DELETED"
+    });
+  }
+  else {
+    console.log('Card does not have existing audio... skipping S3 delete.');
+  }
+  return;
+}
 
-        old_audio_s3_path:
-            Includes full s3 URI of previous audio file that should be deleted.  
-    */
-    console.log('Submitting card to Polly synthesis queue...');
+
+//------------------------------------------------------------------------------
+async function submitCardBackTextToPollyQueue(action, card) {
+
+  validateCardSchema(card);
+  console.log('Preparing to submit card text to Polly queue...');
+  if (card.back_text !== "") {
     var message_body = JSON.stringify(
-        {
-            card_id: card_id, 
-            front_text: front_text,
-            back_text: back_text
-        }
+      {
+          card_id: card.card_id, 
+          front_text: card.front_text,
+          back_text: card.back_text
+      }
     );
     var params = {
         MessageBody: message_body,
@@ -130,7 +163,16 @@ async function submitCardBackTextToPollyQueue(action, card_id, front_text, back_
     };
     await sqs.sendMessage(params).promise();
     console.log('Card submitted!');
-    return;
+    await appSyncClient.updateCard({
+      card_id: card.card_id,
+      back_audio_status: "QUEUED"
+    });
+    console.log('Card status set to QUEUED.');
+  }
+  else {
+    console.log('Card text is empty string, skipping submission to Polly.');
+  }
+  return;
 }
 
 
