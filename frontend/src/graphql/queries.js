@@ -11,6 +11,8 @@ export const listCards = `query ListCards(
         card_id
         front_text
         back_text
+        audio_uri
+        audio_status
       }
       nextToken
     }

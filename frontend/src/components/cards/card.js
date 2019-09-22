@@ -4,37 +4,44 @@ import AudioPlayer from './audio-player.js';
 
 const Card = (props) => {
 
-    //const [frontText, setFrontText] = useState(props.card.front_text);
-    //const [backText, setBackText] = useState(props.card.back_text);
-    //const [isFlipped, setIsFlipped] = useState(false);
-
-    const [frontText] = useState(props.front_text);
-    const [backText] = useState(props.back_text);
-
-    //console.log(props)
-    //console.log("isFlipped = " + isFlipped);
-    //console.log('card props: ' + JSON.stringify(props, null, 2));
- 
-
-
-    return (
-        <div className="card" >
-            <div className="card-content">
-                <CardFront frontText={frontText || '<no front text>'} />
-                <CardBack backText={backText || '<no back text>'} /> 
-                <AudioPlayer audio={props.back_audio} />
-            </div>
-        </div>
-    );
+  return (
+    <div className="card" >
+      <div className="card-content">
+        <CardFront frontText={props.front_text || '<no front text>'} />
+        <CardBack backText={props.back_text || '<no back text>'} /> 
+        <AudioPlayer audio={props.audio_uri} />
+      </div>
+    </div>
+  );
 };
 
 
 const CardFront = (props) => {
+
+  const [isEditMode, setEditMode] = useState(false);
+
+  const toggleEditMode = () => {
+    setEditMode(!isEditMode);
+    console.log('CardFront editable = ', isEditMode);
+  }
+
+  if (isEditMode) {
     return (
-        <div className="card-front">
-            {props.frontText}
-        </div>
+      <div>
+        <input onDoubleClick={() => toggleEditMode()}
+          type="text"
+          defaultValue={props.frontText}
+        />
+      </div>
     );
+  }
+  else {
+    return (
+      <div className="card-front" onDoubleClick={() => toggleEditMode()}>
+        {props.frontText}
+      </div>
+    );
+  }
 };
 
 const CardBack = (props) => {

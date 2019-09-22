@@ -4,7 +4,7 @@ import { Connect } from 'aws-amplify-react';
 import { graphqlOperation } from 'aws-amplify';
 import * as queries from './../../graphql/queries';
 
-const run_local = true;
+const run_local = false;
 
 const CardList = (props) => {
     
@@ -23,6 +23,13 @@ const CardList = (props) => {
   
   function RenderCardList() {
     if (run_local === true) {
+      var testCards = [
+        {
+          card_id: "card_1",
+          front_text: "this is the front text",
+          back_text: "this is the back text"
+        }
+      ];
       return (
         <CardView cards={testCards} />
       );
