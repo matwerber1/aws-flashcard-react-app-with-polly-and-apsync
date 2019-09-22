@@ -1,23 +1,19 @@
 ﻿type Card {
-	back_audio: String
-	back_audio_status: String
-	back_audio_task_id: String
-	back_text: String
 	card_id: ID!
-	front_audio: String
-	front_audio_status: String
 	front_text: String
+	back_text: String
+  audio_uri: String
+  audio_status: String
+  audio_task_id: String
 }
 
 input CreateCardInput {
-	back_audio: String
-	back_audio_status: String
-	back_audio_task_id: String
-	back_text: String
 	card_id: ID
-	front_audio: String
-	front_audio_status: String
-	front_text: String
+	front_text: String!
+	back_text: String!
+  audio_uri: String
+  audio_status: String
+  audio_task_id: String
 }
 
 input DeleteCardInput {
@@ -35,15 +31,13 @@ type ModelCardConnection {
 }
 
 input ModelCardFilterInput {
-	and: [ModelCardFilterInput]
-	back_audio: ModelStringFilterInput
-	back_audio_status: ModelStringFilterInput
-	back_audio_task_id: ModelStringFilterInput
-	back_text: ModelStringFilterInput
 	card_id: ModelIDFilterInput
-	front_audio: ModelStringFilterInput
-	front_audio_status: ModelStringFilterInput
 	front_text: ModelStringFilterInput
+	back_text: ModelStringFilterInput
+  audio_uri: ModelStringFilterInput
+  audio_status: ModelStringFilterInput
+  audio_task_id: ModelStringFilterInput
+	and: [ModelCardFilterInput]
 	not: ModelCardFilterInput
 	or: [ModelCardFilterInput]
 }
@@ -111,7 +105,7 @@ type Mutation {
 
 type Query {
 	getCard(card_id: ID!): Card
-	getCardIdsByBackAudioTaskId(back_audio_task_id: String!): ModelCardConnection
+	getCardIdsByAudioTaskId(audio_task_id: String!): ModelCardConnection
 	listCards(filter: ModelCardFilterInput, limit: Int, nextToken: String): ModelCardConnection
 }
 
@@ -125,14 +119,12 @@ type Subscription {
 }
 
 input UpdateCardInput {
-	back_audio: String
-	back_text: String
-	back_audio_status: String
-	back_audio_task_id: String
 	card_id: ID!
-	front_audio: String
 	front_text: String
-	front_audio_status: String
+	back_text: String
+  audio_uri: String
+  audio_status: String
+  audio_task_id: String
 }
 
 schema {

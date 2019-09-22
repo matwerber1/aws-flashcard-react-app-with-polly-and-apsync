@@ -11,13 +11,13 @@ exports.handler = async (event, context) => {
   for (var r of event.Records) {
     var { taskId, taskStatus } = JSON.parse(r.Sns.Message);
     console.log(`Polly task ${taskId} ended with status ${taskStatus}`);
-    var cards = await appSyncClient.getCardIdsByBackAudioTaskId(taskId);
+    var cards = await appSyncClient.getCardIdsByAudioTaskId(taskId);
     console.log('cards: \n', JSON.stringify(cards, null, 2));
     for (var c of cards) {
       console.log(`Updating card ${c.card_id} back audio status...`);
       await appSyncClient.updateCard({
         card_id: c.card_id,
-        back_audio_status: taskStatus
+        audio_status: taskStatus
       });
       console.log('Update complete');
     }

@@ -18,16 +18,12 @@ exports.handler = async (event, context) => {
 
   for (var r of event.Records) {
     try {
-      var { card_id, back_text } = JSON.parse(r.body);
+      var { card_id, front_text, back_text } = JSON.parse(r.body);
+      var polly_text = `${front_text}<break time="4s" />${back_text}`;
       var action = r.messageAttributes.action.stringValue;
       switch (action) {
         case ACTIONS.CREATE_CARD:
-          var response = await submitBackTextToPolly(card_id, back_text);
-          await updateBackAudioUriInTable(
-            card_id,
-            response.TaskId,
-            response.OutputUri
-          );
+          await submitCardTextToPolly(card_id, polly_text);
           break;
         case ACTIONS.UPDATE_CARD:
           break;
@@ -70,39 +66,46 @@ async function deleteMessageFromQueue(receiptHandle, queueArn) {
 }
 
 //------------------------------------------------------------------------------
-async function submitBackTextToPolly(card_id, back_text) {
+async function submitCardTextToPolly(card_id, raw_text) {
 
-    back_text = `
-        <speak><amazon:domain name="news">
-            ${back_text}
-        </amazon:domain></speak>
-    `;
-    var params = {
-        OutputFormat: 'mp3',
-        OutputS3BucketName: process.env.POLLY_OUTPUT_BUCKET,
-        Text: back_text,
-        VoiceId: 'Matthew',
-        Engine: 'neural',
-        LanguageCode: 'en-US',
-        OutputS3KeyPrefix: `flashcards/${card_id}`,
-        SnsTopicArn: process.env.POLLY_SNS_TOPIC,
-        TextType: 'ssml'
-    };
-    console.log('Creating Polly speech synthesis task...');
-    var response = await polly.startSpeechSynthesisTask(params).promise();
-    console.log('Synthesis task submitted:\n' + JSON.stringify(response));
-    return response.SynthesisTask;
+  var final_text = `
+      <speak><amazon:domain name="news">
+          ${raw_text}
+      </amazon:domain></speak>
+  `;
+  var params = {
+      OutputFormat: 'mp3',
+      OutputS3BucketName: process.env.POLLY_OUTPUT_BUCKET,
+      Text: final_text,
+      VoiceId: 'Matthew',
+      Engine: 'neural',
+      LanguageCode: 'en-US',
+      OutputS3KeyPrefix: `flashcards/${card_id}`,
+      SnsTopicArn: process.env.POLLY_SNS_TOPIC,
+      TextType: 'ssml'
+  };
+  console.log('Creating Polly speech synthesis task...');
+  var response = await polly.startSpeechSynthesisTask(params).promise();
+  console.log('Synthesis task submitted:\n' + JSON.stringify(response));
+  
+  await updateCardAudioUri(
+    card_id,
+    response.SynthesisTask.TaskId,
+    response.SynthesisTask.OutputUri
+  );
+  
+  return;
 }
 
 
 //------------------------------------------------------------------------------
-async function updateBackAudioUriInTable(card_id, task_id, back_audio) {
+async function updateCardAudioUri(card_id, task_id, output_uri) {
 
   var updateVariables = {
     card_id: card_id, 
-    back_audio: back_audio,
-    back_audio_task_id: task_id,
-    back_audio_status: "SYNTHESIS_IN_PROCESS"
+    audio_uri: output_uri,
+    audio_task_id: task_id,
+    audio_status: "SYNTHESIS_IN_PROCESS"
   };
   console.log('Sending mutation to update card...');
   var response = await appSyncClient.updateCard(updateVariables);

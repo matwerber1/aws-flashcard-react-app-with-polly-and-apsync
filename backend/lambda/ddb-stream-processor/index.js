@@ -27,29 +27,22 @@ exports.handler = async (event, context) => {
 
       switch (record.eventName) {
         case "INSERT":
-          var newImage = record.dynamodb.NewImage;
-          await submitCardBackTextToPollyQueue(ACTIONS.CREATE_CARD, newImage);
+          var newCard = record.dynamodb.NewImage;
+          await submitCardTextToPollyQueue(ACTIONS.CREATE_CARD, newCard);
           processed_records += 1;
           break;
         
         case "REMOVE":
-          var oldImage = record.dynamodb.OldImage;
-          await deleteAudioFromS3(oldImage);
+          var oldCard = record.dynamodb.OldImage;
+          await deleteAudioFromS3(oldCard);
           processed_records += 1;
           break;
         
         case "MODIFY":
-          var oldImage = record.dynamodb.OldImage;
-          var newImage = record.dynamodb.NewImage;
-          if (oldImage.hasOwnProperty("back_text") && newImage.hasOwnProperty("back_text")) {
-            if (oldImage.back_text !== newImage.back_text) {
-              console.log('Card text has changed. Deleting old text and submitting new text to Polly...');
-              await deleteAudioFromS3(oldImage);
-              await submitCardBackTextToPollyQueue(ACTIONS.CREATE_CARD, newImage);
-            }
-            else {
-              console.log('Card text did not change, nothing left to do.');
-            }
+          var oldCard = record.dynamodb.OldImage;
+          var newCard = record.dynamodb.NewImage;
+          if (cardTextHasChanged(oldCard, newCard)) {
+            await swapOldAudioWithNewPollySynthesis(oldCard, newCard);
           }
           processed_records += 1;
           break;
@@ -65,6 +58,34 @@ exports.handler = async (event, context) => {
   }
   return `Records: ${processed_records} processed, ${skipped_records} skipped, ${errored_records} errors`;
 };
+
+
+//------------------------------------------------------------------------------
+async function swapOldAudioWithNewPollySynthesis(oldCard, newCard) {
+  console.log('Deleting old audio and submitting new text to Polly...');
+  await deleteAudioFromS3(oldCard);
+  await submitCardTextToPollyQueue(ACTIONS.CREATE_CARD, newCard);
+  return;
+}
+
+
+//------------------------------------------------------------------------------
+function cardTextHasChanged(oldCard, newCard) {
+
+  if (
+       (oldCard.back_text !== newCard.back_text)
+    || (oldCard.front_text !== newCard.front_text)
+  ) {
+    console.log("Card text has changed.");
+    return true;
+  }
+  else {
+    console.log("Card text has not changed. ");
+    return false;
+  }
+
+}
+
 
 //------------------------------------------------------------------------------
 // Convert DynamoDB record into Javascript Object
@@ -118,8 +139,8 @@ function validateCardSchema(card) {
 async function deleteAudioFromS3(card) {
 
   console.log('Preparing to delete audio from S3...');
-  if (card.hasOwnProperty('back_audio')) {
-    var [bucket, key] = getBucketAndKeyFromS3Uri(card.back_audio);
+  if (card.hasOwnProperty('audio_uri')) {
+    var [bucket, key] = getBucketAndKeyFromS3Uri(card.audio_uri);
     await s3.deleteObject({
       Bucket: bucket,
       Key: key
@@ -127,7 +148,7 @@ async function deleteAudioFromS3(card) {
     console.log(`Audio deleted.`);
     await appSyncClient.updateCard({
       card_id: card.card_id,
-      back_audio_status: "DELETED"
+      audio_status: "DELETED"
     });
   }
   else {
@@ -138,40 +159,37 @@ async function deleteAudioFromS3(card) {
 
 
 //------------------------------------------------------------------------------
-async function submitCardBackTextToPollyQueue(action, card) {
+async function submitCardTextToPollyQueue(action, card) {
 
-  validateCardSchema(card);
+  //validateCardSchema(card);
   console.log('Preparing to submit card text to Polly queue...');
-  if (card.back_text !== "") {
-    var message_body = JSON.stringify(
-      {
-          card_id: card.card_id, 
-          front_text: card.front_text,
-          back_text: card.back_text
-      }
-    );
-    var params = {
-        MessageBody: message_body,
-        QueueUrl: process.env.POLLY_SQS_QUEUE,
-        DelaySeconds: 15,
-        MessageAttributes: {
-          'action': {
-            DataType: 'String',
-            StringValue: action
-          }
+
+  var message_body = JSON.stringify(
+    {
+        card_id: card.card_id, 
+        front_text: card.front_text,
+        back_text: card.back_text
+    }
+  );
+  var params = {
+      MessageBody: message_body,
+      QueueUrl: process.env.POLLY_SQS_QUEUE,
+      DelaySeconds: 5,      // should this be zero? any benefit to > 0?
+      MessageAttributes: {
+        'action': {
+          DataType: 'String',
+          StringValue: action
         }
-    };
-    await sqs.sendMessage(params).promise();
-    console.log('Card submitted!');
-    await appSyncClient.updateCard({
-      card_id: card.card_id,
-      back_audio_status: "QUEUED"
-    });
-    console.log('Card status set to QUEUED.');
-  }
-  else {
-    console.log('Card text is empty string, skipping submission to Polly.');
-  }
+      }
+  };
+  await sqs.sendMessage(params).promise();
+  console.log('Card submitted!');
+  await appSyncClient.updateCard({
+    card_id: card.card_id,
+    audio_status: "QUEUED"
+  });
+  console.log('Card status set to QUEUED.');
+
   return;
 }
 
